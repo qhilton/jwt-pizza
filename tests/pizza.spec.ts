@@ -298,6 +298,22 @@ async function basicInit(page: Page) {
     }
   });
 
+  await page.route('*/**/api/franchise/:franchiseId/store/:storeId', async (route) => {
+    const req = route.request();
+    const method = req.method();
+
+    if (method == "DELETE") {
+      const authHeader = req.headers()['authorization'];
+      expect(authHeader).toBe('Bearer abcdef');
+
+      expect(route.request().method()).toBe('DELETE');
+      await route.fulfill({
+        status: 200,
+        json: {},
+      });
+    }
+  });
+
   await page.goto('/');
 }
 
@@ -413,4 +429,18 @@ test('create Store', async ({ page }) => {
   await page.getByRole('textbox', { name: 'store name' }).click();
   await page.getByRole('textbox', { name: 'store name' }).fill('Provo');
   await page.getByRole('button', { name: 'Create' }).click();
+});
+
+test('delete Store', async ({ page }) => {
+  await basicInit(page);
+  await page.getByLabel('Global').getByRole('link', { name: 'Franchise' }).click();
+  await page.getByRole('link', { name: 'Login', exact: true }).click();
+  // await page.getByRole('link', { name: 'Login' }).click();
+  await page.getByRole('textbox', { name: 'Email address' }).fill('f@jwt.com');
+  await page.getByRole('textbox', { name: 'Password' }).fill('franchisee');
+  await page.getByRole('button', { name: 'Login' }).click();
+  await page.getByLabel('Global').getByRole('link', { name: 'Franchise' }).click();
+
+  await page.getByRole('row', { name: 'American Fork 0 ₿ Close' }).getByRole('button').click();
+  await page.getByRole('button', { name: 'Close' }).click();
 });
