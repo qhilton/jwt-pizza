@@ -5,6 +5,8 @@ on:
     branches:
       - main
   workflow_dispatch:
+env:
+  ACTIONS_STEP_DEBUG: true
 jobs:
   build:
     name: Build
@@ -39,15 +41,13 @@ jobs:
 
       - name: Run tests
         run: |
+          set -x  # print each command as it runs
 
+          echo "cd into service..."
           cd jwt-pizza-service
-          npm ci
+          npm ci && npm run start
 
-          # Start backend service in background
-          npm start &
-
-          # Wait for backend to be ready (adjust port if needed)
-          npx wait-on http://localhost:3000
+          echo "Starting backend..."
 
           # Run frontend tests
           cd ../jwt-pizza
