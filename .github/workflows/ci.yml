@@ -39,6 +39,18 @@ jobs:
 
       - name: Run tests
         run: |
+
+          cd ../jwt-pizza-service
+          npm ci
+
+          # Start backend service in background
+          npm start &
+
+          # Wait for backend to be ready (adjust port if needed)
+          npx wait-on http://localhost:3000
+
+          # Run frontend tests
+          cd ../jwt-pizza
           npx playwright install --with-deps chromium
           npm run test:coverage
 

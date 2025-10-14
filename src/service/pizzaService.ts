@@ -98,6 +98,7 @@ interface PizzaService {
   login(email: string, password: string): Promise<User>;
   register(email: string, password: string, role: string): Promise<User>;
   logout(): void;
+  updateUser(user: User): Promise<User>;
   getUser(): Promise<User | null>;
   getMenu(): Promise<Menu>;
   getOrders(user: User): Promise<OrderHistory>;
