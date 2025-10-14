@@ -40,7 +40,7 @@ jobs:
       - name: Run tests
         run: |
 
-          cd ../jwt-pizza-service
+          cd jwt-pizza-service
           npm ci
 
           # Start backend service in background
