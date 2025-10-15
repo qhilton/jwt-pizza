@@ -42,287 +42,191 @@ async function basicInit(page: Page) {
       await route.fulfill({ json: loginRes });
     }
     else if (req.method() == "POST") {
-      const regReq = req.postDataJSON();
-      const { name, email, password } = regReq;
+			const registerReq = req.postDataJSON();
+			const { name, email, password } = registerReq;
 
-      // if (!name || !email || !password) {
-      //   await route.fulfill({ status: 400, json: { message: 'name, email, and password are required' } });
-      //   return;
-      // }
+			// Check if user already exists
+			if (validUsers[email]) {
+				await route.fulfill({
+					status: 409,
+					json: { error: 'User already exists' }
+				});
+				return;
+			}
 
-      // if (validUsers[email]) {
-      //   await route.fulfill({ status: 409, json: { message: 'User already exists' } });
-      //   return;
-      // }
+			// Create new user
+			const newUserId = String(Object.keys(validUsers).length + 6); // Start from 6 since existing users have ids 3,4,5
+			const newUser: User = {
+				id: newUserId,
+				name: name,
+				email: email,
+				password: password,
+				roles: [{ role: Role.Diner }]
+			};
 
-      const newUser = {
-        id: 5,
-        name: name,
-        email: email,
-        password: password,
-        role: [{ role: Role.Diner }]
-      };
-      
-      // loggedInUser = newUser;
-      const regRes = {
-        user: newUser,
-        token: 'abcdef',
-      };
-      expect(route.request().method()).toBe('POST');
-      await route.fulfill({ status: 200, json: regRes });
+			// Add to valid users
+			validUsers[email] = newUser;
+
+			// Set as logged in user and generate token
+			loggedInUser = newUser;
+			// loggedInToken = 'abcdef';
+
+			const registerRes = {
+				user: {
+					id: parseInt(newUserId),
+					name: newUser.name,
+					email: newUser.email,
+					roles: newUser.roles
+				},
+				token: 'abcdef',
+			};
+
+			await route.fulfill({
+				status: 200,
+				json: registerRes
+			});
     }
   });
 
   // Return the currently logged in user
-  await page.route('*/**/api/user/me', async (route) => {
-    expect(route.request().method()).toBe('GET');
-    await route.fulfill({ json: loggedInUser });
-  });
+  // await page.route('*/**/api/user/me', async (route) => {
+  //   expect(route.request().method()).toBe('GET');
+  //   await route.fulfill({ json: loggedInUser });
+  // });
 
-  // A standard menu
-  await page.route('*/**/api/order/menu', async (route) => {
-    const req = route.request();
-    const method = req.method();
+  // Update user information
+	// await page.route(/\/api\/user\/\d+$/, async (route) => {
+	// 	const req = route.request();
 
-    if (method == "GET") {
-      const menuRes = [
-        {
-          id: 1,
-          title: 'Veggie',
-          image: 'pizza1.png',
-          price: 0.0038,
-          description: 'A garden of delight',
-        },
-        {
-          id: 2,
-          title: 'Pepperoni',
-          image: 'pizza2.png',
-          price: 0.0042,
-          description: 'Spicy treat',
-        },
-      ];
-      expect(route.request().method()).toBe('GET');
-      await route.fulfill({ json: menuRes });
-    }
-    else if (method == "PUT") {
-      const authHeader = req.headers()['authorization'];
-      expect(authHeader).toBe('Bearer abcdef');
+	// 	if (req.method() === 'PUT') {
+	// 		const authHeader = req.headers()['authorization'];
+	// 		expect(authHeader).toBe('Bearer abcdef');
 
-      const newReq = req.postDataJSON();
-      const { title, image, price, description } = newReq;
-      const newItem = {
-        id: 3,
-        title: title,
-        image: image,
-        price: price,
-        description: description,
-      };
+	// 		const updateReq = req.postDataJSON();
+	// 		const { name, email, password } = updateReq;
 
-      expect(route.request().method()).toBe('PUT');
-      await route.fulfill({
-        status: 200,
-        json: [newItem],
-      });
-    }
-  });
+	// 		// Update the logged in user
+	// 		if (loggedInUser) {
+	// 			loggedInUser.name = name || loggedInUser.name;
+	// 			loggedInUser.email = email || loggedInUser.email;
+	// 			if (password) {
+	// 				loggedInUser.password = password;
+	// 			}
 
-  await page.route(/\/api\/franchise(\/\d+)?$/, async (route) => {
-    const req = route.request();
-    const method = req.method();
+	// 			// Update in validUsers as well
+	// 			// if (validUsers[loggedInUser.email]) {
+	// 			// 	validUsers[loggedInUser.email] = loggedInUser;
+	// 			// }
+	// 		}
 
-    if (method == "DELETE") {
-      const authHeader = req.headers()['authorization'];
-      expect(authHeader).toBe('Bearer abcdef');
+	// 		// Return the response format that matches the actual API
+	// 		await route.fulfill({
+	// 			status: 200,
+	// 			json: {
+	// 				user: loggedInUser,
+	// 				token: 'abcdef'
+	// 			}
+	// 		});
+	// 		return;
+	// 	}
 
-      expect(route.request().method()).toBe('DELETE');
-      await route.fulfill({
-        status: 200,
-        json: {},
-      });
-    }
+	// 	await route.fulfill({ status: 405, json: { error: 'Method Not Allowed' } });
+	// });
 
-    else if (method == "GET") {
-      const authHeader = req.headers()['authorization'];
-      expect(authHeader).toBe('Bearer abcdef');
+	await page.route(/\/api\/user(\/\d+)?(\?.*)?$/, async (route) => {
+		const req = route.request();
+		const url = req.url();
+		const method = req.method();
+		
+		// Check if this is a specific user endpoint (/api/user/:id)
+		const userIdMatch = url.match(/\/api\/user\/(\d+)$/);
+		const userId = userIdMatch ? userIdMatch[1] : null;
+		
+		// Handle /api/user/me (get current user)
+		if (method === 'GET' && url.endsWith('/api/user/me')) {
+			await route.fulfill({ json: loggedInUser });
+			return;
+		}
+		
+		// Handle GET /api/user (list users)
+		if (method === 'GET' && !userId && !url.endsWith('/me')) {
+			const authHeader = req.headers()['authorization'];
+			expect(authHeader).toBe('Bearer abcdef');
+			
+			const mockUsers = Object.values(validUsers).map(user => ({
+				id: parseInt(user.id ?? '0'),
+				name: user.name,
+				email: user.email,
+				roles: user.roles
+			}));
+			
+			await route.fulfill({
+				status: 200,
+				json: {
+					userList: mockUsers,
+					more: false
+				}
+			});
+			return;
+		}
+		
+		// Handle PUT /api/user/:id (update user)
+		if (method === 'PUT' && userId) {
+			const authHeader = req.headers()['authorization'];
+			expect(authHeader).toBe('Bearer abcdef');
 
-      const match = req.url().match(/\/api\/franchise\/(\d+)/);
-      const userId = match ? match[1] : undefined;
+			const updateReq = req.postDataJSON();
+			const { name, email, password } = updateReq;
 
-      if (userId == '5') {
-        const franchiseRes = [{
-          id: 1,
-          name: 'LotaPizza',
-          admins: {
-            id: '5',
-            name: 'Bob',
-            email: 'f@jwt.com'
-          },
-          stores: [
-            { id: 4, name: 'Lehi', totalRevenue: 0 },
-            { id: 5, name: 'Springville', totalRevenue: 0 },
-            { id: 6, name: 'American Fork', totalRevenue: 0 },
-          ],
-        }];
+			// Update the logged in user
+			if (loggedInUser) {
+				loggedInUser.name = name || loggedInUser.name;
+				loggedInUser.email = email || loggedInUser.email;
+				if (password) {
+					loggedInUser.password = password;
+				}
+			}
 
-        expect(route.request().method()).toBe('GET');
-        await route.fulfill({
-          status: 200,
-          json: franchiseRes,
-        });
-        return;
-      }
-    }
-  });
-
-  // Standard franchises and stores
-  await page.route(/\/api\/franchise(\?.*)?$/, async (route) => {
-    const req = route.request();
-    const method = req.method();
-
-    if (method == "GET") {
-      const franchiseRes = {
-        franchises: [
-          {
-            id: 2,
-            name: 'LotaPizza',
-            stores: [
-              { id: 4, name: 'Lehi' },
-              { id: 5, name: 'Springville' },
-              { id: 6, name: 'American Fork' },
-            ],
-          },
-          { id: 3, name: 'PizzaCorp', stores: [{ id: 7, name: 'Spanish Fork' }] },
-          { id: 4, name: 'topSpot', stores: [] },
-        ],
-      };
-      expect(route.request().method()).toBe('GET');
-      await route.fulfill({ json: franchiseRes });
-    }
-    
-  });
+			await route.fulfill({
+				status: 200,
+				json: {
+					user: loggedInUser,
+					token: 'abcdef'
+				}
+			});
+			return;
+		}
+		
+		// Handle DELETE /api/user/:id (delete user)
+		if (method === 'DELETE' && userId) {
+			const authHeader = req.headers()['authorization'];
+			expect(authHeader).toBe('Bearer abcdef');
+			
+			// Find and remove user from validUsers
+			const userToDelete = Object.values(validUsers).find(user => user.id === userId);
+			if (userToDelete && userToDelete.email) {
+				delete validUsers[userToDelete.email];
+			}
+			
+			await route.fulfill({
+				status: 200,
+				json: { message: 'User deleted successfully' }
+			});
+			return;
+		}
+		
+		// Default fallback
+		await route.fulfill({ status: 405, json: { error: 'Method Not Allowed' } });
+	});
 
   
-
-  // Order a pizza.
-  await page.route('*/**/api/order', async (route) => {
-    const req = route.request();
-    const method = req.method();
-
-    if (method == "POST") {
-      const orderReq = route.request().postDataJSON();
-      const orderRes = {
-        order: { ...orderReq, id: 23 },
-        jwt: 'eyJpYXQ',
-      };
-      expect(route.request().method()).toBe('POST');
-      await route.fulfill({ json: orderRes });
-    }
-    else if (method == "GET") {
-      const url = new URL(req.url());
-      const pageParam = url.searchParams.get('page') || '1';
-
-      const mockOrders = [
-        {
-          id: 1,
-          item: 'Pepperoni',
-          quantity: 2,
-          createdAt: '2023-10-01T12:00:00Z',
-        },
-        {
-          id: 2,
-          item: 'Crusty',
-          quantity: 1,
-          createdAt: '2023-10-02T14:00:00Z',
-        }
-      ];
-
-      const paginated = {
-        page: parseInt(pageParam),
-        totalPages: 1,
-        orders: mockOrders,
-      };
-
-      expect(method).toBe('GET');
-
-      await route.fulfill({
-        status: 200,
-        json: paginated,
-      });
-    }
-    
-  });
-
-  await page.route('*/**/api/franchise', async (route) => {
-    const req = route.request();
-    const method = req.method();
-
-    if (method == "POST") {
-      const authHeader = req.headers()['authorization'];
-      expect(authHeader).toBe('Bearer abcdef');
-
-      const newReq = req.postDataJSON();
-      const { name, email } = newReq;
-
-      const newFranchisee = {
-        name: name,
-        email: email,
-      }
-
-      expect(method).toBe('POST');
-      await route.fulfill({
-        status: 200,
-        json: newFranchisee,
-      });
-    }
-  
-  });
-
-
-  await page.route('*/**/api/franchise/:franchiseId/store', async (route) => {
-    const req = route.request();
-    const method = req.method();
-
-    if (method == "POST") {
-      const authHeader = req.headers()['authorization'];
-      expect(authHeader).toBe('Bearer abcdef');
-
-      const newReq = req.postDataJSON();
-
-      const newStore = {
-        name: newReq.name,
-      }
-
-      expect(method).toBe('POST');
-      await route.fulfill({
-        status: 200,
-        json: newStore,
-      });
-    }
-  });
-
-  await page.route('*/**/api/franchise/:franchiseId/store/:storeId', async (route) => {
-    const req = route.request();
-    const method = req.method();
-
-    if (method == "DELETE") {
-      const authHeader = req.headers()['authorization'];
-      expect(authHeader).toBe('Bearer abcdef');
-
-      expect(route.request().method()).toBe('DELETE');
-      await route.fulfill({
-        status: 200,
-        json: {},
-      });
-    }
-  });
-
   await page.goto('/');
 }
 
 
 
 test('updateUser', async ({ page }) => {
-  // await basicInit(page);
+  await basicInit(page);
   const email = `user${Math.floor(Math.random() * 10000)}@jwt.com`;
   await page.goto('/');
   await page.getByRole('link', { name: 'Register' }).click();
@@ -384,4 +288,20 @@ test('updatePassword', async ({ page }) => {
   await page.getByRole('link', { name: 'pd' }).click();
 
   await expect(page.getByRole('main')).toContainText('pizza diner');
+});
+
+test('listUsers', async ({ page }) => {
+  await basicInit(page);
+  await page.getByRole('link', { name: 'Login' }).click();
+  await page.getByRole('textbox', { name: 'Email address' }).fill('a@jwt.com');
+  await page.getByRole('textbox', { name: 'Password' }).fill('admin');
+  await page.getByRole('button', { name: 'Login' }).click();
+
+  await page.getByRole('link', { name: 'Admin' }).click();
+  await page.getByRole('button', { name: 'Show All Users' }).click();
+
+  await page.getByRole('cell', { name: 'a@jwt.com' }).click();
+  await page.getByRole('columnheader', { name: 'Email' }).click();
+
+  await page.getByRole('row', { name: 'Name Email Role Action' }).getByRole('button').click();
 });
