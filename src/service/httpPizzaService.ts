@@ -77,15 +77,11 @@ class HttpPizzaService implements PizzaService {
   }
 
   async getUsers(page: number = 0, limit: number = 10, nameFilter: string = '*'): Promise<UserList> {
-    // let result: User | null = null;
-    // if (localStorage.getItem('token')) {
-    //   try {
-    //     result = await this.callEndpoint('/api/user/');
-    //   } catch (e) {
-    //     localStorage.removeItem('token');
-    //   }
-    // }
     return this.callEndpoint(`/api/user?page=${page}&limit=${limit}&name=${nameFilter}`);
+  }
+
+  async deleteUser(userId: number = 0): Promise<null> {
+    return this.callEndpoint(`/api/user/${userId}`, 'DELETE');
   }
 
   async getMenu(): Promise<Menu> {

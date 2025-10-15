@@ -54,15 +54,12 @@ export default function AdminDashboard(props: Props) {
 
   async function filterUsers() {
     setUserList(await pizzaService.getUsers(usersPage, 10, `*${filterUsersRef.current?.value}*`));
-    // setTimeout(() => {
-    //   HSOverlay.close(document.getElementById('hs-user-list-modal')!);
-    // }, 100);
   }
 
   async function deleteUser(userId: number) {
     if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       try {
-        // await pizzaService.deleteUser(userId);
+        await pizzaService.deleteUser(userId);
         setUserList(await pizzaService.getUsers(usersPage, 10, '*'));
       } catch (error) {
         console.error('Failed to delete user:', error);
@@ -70,11 +67,6 @@ export default function AdminDashboard(props: Props) {
       }
     }
   }
-
-  console.log(document.getElementById('hs-user-list-modal'));
-
-  console.log('props.user:', props.user);
-console.log('is admin?', Role.isRole(props.user, Role.Admin));
 
   let response = <NotFound />;
   if (Role.isRole(props.user, Role.Admin)) {
