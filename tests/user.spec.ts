@@ -261,7 +261,7 @@ test('updateUser', async ({ page }) => {
 });
 
 test('updatePassword', async ({ page }) => {
-  // await basicInit(page);
+  await basicInit(page);
   const email = `user${Math.floor(Math.random() * 10000)}@jwt.com`;
   await page.goto('/');
   await page.getByRole('link', { name: 'Register' }).click();
